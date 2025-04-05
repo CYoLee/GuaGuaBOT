@@ -1,0 +1,4 @@
+# config.py
+
+# Define the GUILD_IDS for your server
+GUILD_IDS = [1299413864160428054, 1125331349654470786]

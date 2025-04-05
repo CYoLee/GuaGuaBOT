@@ -1,0 +1,16 @@
+notifications.json
+ids.txt
+.env
+firebase-key.json
+firebase.json
+# Ignore all files inside screenshots folder, but keep the folder itself
+screenshots/*
+!screenshots/.gitkeep
+
+# Ignore all log files
+log.txt
+ocr_log.txt
+logs/*
+!logs/.gitkeep
+release.bat
+fuck.bat
