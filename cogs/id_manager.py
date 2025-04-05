@@ -90,12 +90,12 @@ class IDManager(Cog):
             f"📋 Player ID List:\n{ids_text}", ephemeral=True
         )
 
-    # async def cog_load(self):
-    #     for gid in GUILD_IDS:  # Use GUILD_IDS defined in config.py or another location
-    #         guild = discord.Object(id=gid)
-    #         self.bot.tree.add_command(self.add_id, guild=guild)
-    #         self.bot.tree.add_command(self.remove_id, guild=guild)
-    #         self.bot.tree.add_command(self.list_ids, guild=guild)
+    async def cog_load(self):
+        for gid in GUILD_IDS:  # Use GUILD_IDS defined in config.py or another location
+            guild = discord.Object(id=gid)
+            self.bot.tree.add_command(self.add_id, guild=guild)
+            self.bot.tree.add_command(self.remove_id, guild=guild)
+            self.bot.tree.add_command(self.list_ids, guild=guild)
 
 
 async def setup(bot):

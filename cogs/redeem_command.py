@@ -102,12 +102,12 @@ class RedeemCommand(Cog):
                 f"{player_id} -> Waiting for redeem result..."
             )
 
-    # async def cog_load(self):
-    #     for gid in GUILD_IDS:
-    #         guild = discord.Object(id=gid)
-    #         if ENABLE_DIRECT_REDEEM:
-    #             self.bot.tree.add_command(self.redeem, guild=guild)
-    #         self.bot.tree.add_command(self.redeem_submit, guild=guild)
+    async def cog_load(self):
+        for gid in GUILD_IDS:
+            guild = discord.Object(id=gid)
+            if ENABLE_DIRECT_REDEEM:
+                self.bot.tree.add_command(self.redeem, guild=guild)
+            self.bot.tree.add_command(self.redeem_submit, guild=guild)
 
 
 async def setup(bot):

@@ -45,9 +45,9 @@ class HelpCommand(Cog):
             )
         await interaction.response.send_message(content, ephemeral=True)
 
-    # async def cog_load(self):
-    #     for gid in GUILD_IDS:
-    #         self.bot.tree.add_command(self.help, guild=discord.Object(id=gid))
+    async def cog_load(self):
+        for gid in GUILD_IDS:
+            self.bot.tree.add_command(self.help, guild=discord.Object(id=gid))
 
 
 async def setup(bot):

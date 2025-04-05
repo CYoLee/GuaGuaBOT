@@ -18,8 +18,8 @@ class Notify(Cog):
         name="add_notify", description="Add event reminder / 新增活動提醒"
     )
     @app_commands.describe(
-        date="提醒日期（格式：YYYY-MM-DD）",
-        time="提醒時間（格式：HH:MM）",
+        date="提醒日期（可用逗號分隔，如：2025-04-05,2025-04-06）",
+        time="提醒時間（可用逗號分隔，如：20:30,21:00）",
         message="提醒內容",
         mention="要標記的人（可選）",
     )
@@ -33,26 +33,44 @@ class Notify(Cog):
     ):
         await interaction.response.defer(thinking=True)
 
-        try:
-            dt_str = f"{date} {time}"
-            naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            aware_dt = TIMEZONE.localize(naive_dt)
-        except ValueError:
+        dates = [d.strip() for d in date.split(",") if d.strip()]
+        times = [t.strip() for t in time.split(",") if t.strip()]
+
+        # 🚫 禁止同時輸入多個日期與多個時間
+        if len(dates) > 1 and len(times) > 1:
             await interaction.followup.send(
-                "❌ 時間格式錯誤，請使用 YYYY-MM-DD 與 HH:MM。", ephemeral=True
+                "❌ 不支援同時輸入多個日期與多個時間，請擇一使用多筆輸入。",
+                ephemeral=True,
             )
             return
 
-        data = {
-            "guild_id": str(interaction.guild_id),
-            "channel_id": interaction.channel.id,
-            "datetime": aware_dt,
-            "mention": mention or "",
-            "message": message,
-        }
+        added_count = 0
 
-        self.db.collection("notifications").add(data)
-        await interaction.followup.send("✅ 提醒已新增。")
+        for d in dates:
+            for t in times:
+                try:
+                    dt_str = f"{d} {t}"
+                    naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+                    aware_dt = TIMEZONE.localize(naive_dt)
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ 時間格式錯誤：`{d}` + `{t}`，請使用 YYYY-MM-DD 與 HH:MM。",
+                        ephemeral=True,
+                    )
+                    return
+
+                data = {
+                    "guild_id": str(interaction.guild_id),
+                    "channel_id": interaction.channel.id,
+                    "datetime": aware_dt,
+                    "mention": mention or "",
+                    "message": message,
+                }
+
+                self.db.collection("notifications").add(data)
+                added_count += 1
+
+        await interaction.followup.send(f"✅ 已新增 {added_count} 筆提醒。")
 
     @app_commands.command(
         name="list_notify", description="List all reminders / 查看目前提醒列表"
@@ -105,12 +123,12 @@ class Notify(Cog):
         else:
             await interaction.followup.send("❌ 找不到符合條件的提醒。")
 
-    # async def cog_load(self):
-    #     for gid in GUILD_IDS:
-    #         guild = discord.Object(id=gid)
-    #         self.bot.tree.add_command(self.add_notify, guild=guild)
-    #         self.bot.tree.add_command(self.list_notify, guild=guild)
-    #         self.bot.tree.add_command(self.remove_notify, guild=guild)
+    async def cog_load(self):
+        for gid in GUILD_IDS:
+            guild = discord.Object(id=gid)
+            self.bot.tree.add_command(self.add_notify, guild=guild)
+            self.bot.tree.add_command(self.list_notify, guild=guild)
+            self.bot.tree.add_command(self.remove_notify, guild=guild)
 
 
 async def setup(bot):

@@ -30,13 +30,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"✅ GuaGuaBOT is online as {bot.user}")
 
-    try:
-        for gid in GUILD_IDS:
-            guild = discord.Object(id=gid)
-            synced = await bot.tree.sync(guild=guild)
-            print(f"✅ Synced {len(synced)} commands for guild {gid}")
-    except Exception as e:
-        print(f"❌ Failed to sync commands: {e}")
+    # ⚠️ 清除全域指令
+    await bot.tree.sync()  # 先拉下現有的
+    bot.tree.clear_commands()  # 全部清除
+    await bot.tree.sync()  # 同步上去
+    print("🧹 Cleared global slash commands.")
+
+    # ✅ 接著重新註冊 Guild 指令
+    for gid in GUILD_IDS:
+        guild = discord.Object(id=gid)
+        await bot.tree.sync(guild=guild)
+        print(f"✅ Synced commands for guild {gid}")
 
     notify_task.start()
 
@@ -66,9 +70,9 @@ async def notify_task():
                 channel = await bot.fetch_channel(channel_id)
                 if channel:
                     content = (
-                        f"{mention}\n⏰ 活動提醒：{message}"
+                        f"{mention}\n⏰ 活動提醒 ⏰{message}"
                         if mention
-                        else f"⏰ 活動提醒：{message}"
+                        else f"⏰ 活動提醒 ⏰{message}"
                     )
                     await channel.send(content)
                     db.collection("notifications").document(doc.id).delete()
