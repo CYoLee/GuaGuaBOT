@@ -110,7 +110,7 @@ class Notify(Cog):
         for i, doc in enumerate(docs):
             data = doc.to_dict()
             dt = data["datetime"].astimezone(TIMEZONE).strftime("%Y-%m-%d %H:%M")
-            messages.append(f"{i}. {dt} | {data['message']}")
+            messages.append(f"[{i}] {dt} | {data['message']}")
             indexed_docs.append((i, doc.id))
 
         if messages:
