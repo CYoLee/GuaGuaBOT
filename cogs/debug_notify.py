@@ -69,9 +69,8 @@ class DebugNotify(Cog):
             self.bot.tree.add_command(self.show_now_time, guild=guild)
             self.bot.tree.add_command(self.whoami, guild=guild)
             self.bot.tree.add_command(self.debug_firestore_count, guild=guild)
+            print("✅ cog_load() triggered in debug_notify")
 
 
 async def setup(bot):
-    cog = DebugNotify(bot)
-    await bot.add_cog(cog)
-    await cog.cog_load()
+    await bot.add_cog(DebugNotify(bot))
