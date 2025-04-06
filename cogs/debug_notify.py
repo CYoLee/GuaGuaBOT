@@ -1,4 +1,5 @@
 # cogs/debug_notify.py
+import os
 import discord
 from discord import app_commands
 from discord.ext.commands import Cog
@@ -8,8 +9,9 @@ from firebase_admin import firestore
 from datetime import datetime
 import pytz
 
-OWNER_ID = 271962747225374721  # ✅ 你的 Discord ID
+OWNER_ID = 271962747225374721
 TIMEZONE = pytz.timezone("Asia/Taipei")
+ENABLE_DEBUG_COMMANDS = os.getenv("ENABLE_DEBUG_COMMANDS", "false").lower() == "true"
 
 
 class DebugNotify(Cog):
@@ -26,7 +28,6 @@ class DebugNotify(Cog):
                 "🚫 你無權使用這個指令。", ephemeral=True
             )
             return
-
         await interaction.response.send_message("🛠️ 立即執行通知排程...", ephemeral=True)
         await run_notify_once(self.bot)
 
@@ -63,19 +64,18 @@ class DebugNotify(Cog):
         )
 
     async def cog_load(self):
+        if not ENABLE_DEBUG_COMMANDS:
+            print("🚫 Debug commands disabled by .env config.")
+            return
         for gid in GUILD_IDS:
             guild = discord.Object(id=gid)
             self.bot.tree.add_command(self.trigger_notify_test, guild=guild)
             self.bot.tree.add_command(self.show_now_time, guild=guild)
             self.bot.tree.add_command(self.whoami, guild=guild)
             self.bot.tree.add_command(self.debug_firestore_count, guild=guild)
-
-            print(f"✅ cog_load() triggered in debug_notify for guild: {gid}")
-
-        # ✅ 強制刷新一次指令（防止未同步成功）
-        # synced = await self.bot.tree.sync(guild=guild)
-        # print(f"🔁 Synced {len(synced)} command(s) to guild: {gid}")
+            print(f"✅ Registered debug commands to guild: {gid}")
 
 
 async def setup(bot):
-    await bot.add_cog(DebugNotify(bot))
+    if ENABLE_DEBUG_COMMANDS:
+        await bot.add_cog(DebugNotify(bot))

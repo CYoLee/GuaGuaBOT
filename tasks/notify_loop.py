@@ -14,8 +14,8 @@ async def run_notify_once(bot: discord.Client):
     now_utc = datetime.now(pytz.utc)
     now_taipei = now_utc.astimezone(TIMEZONE)
 
-    lower_bound = now_utc - timedelta(seconds=90)
-    upper_bound = now_utc + timedelta(seconds=90)
+    lower_bound = now_utc - timedelta(seconds=30)
+    upper_bound = now_utc + timedelta(seconds=15)
 
     print(f"🔁 notify_task run (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"🕰️ 台北時間：{now_taipei.strftime('%Y-%m-%d %H:%M:%S')}")
