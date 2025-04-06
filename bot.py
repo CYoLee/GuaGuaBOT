@@ -36,6 +36,18 @@ async def on_ready():
     await bot.tree.sync()  # 同步上去
     print("🧹 Cleared global slash commands.")
 
+    # 🚫 清除舊的 debug guild 指令（如曾經註冊過）
+    for gid in GUILD_IDS:
+        guild = discord.Object(id=gid)
+        for cmd in bot.tree.get_commands(guild=guild):
+            if (
+                cmd.name.startswith("debug")
+                or cmd.name.startswith("trigger")
+                or cmd.name == "whoami"
+            ):
+                bot.tree.remove_command(cmd.name, guild=guild)
+        print(f"🧹 Removed old debug commands in guild {gid}")
+
     # ✅ 接著重新註冊 Guild 指令
     for gid in GUILD_IDS:
         guild = discord.Object(id=gid)
