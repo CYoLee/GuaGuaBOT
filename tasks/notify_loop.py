@@ -10,13 +10,16 @@ TIMEZONE = pytz.timezone("Asia/Taipei")
 
 
 async def run_notify_once(bot: discord.Client):
-    db = firestore.client()  # ✅ 改成「延遲初始化」
-    now = datetime.now(TIMEZONE)
-    lower_bound = now - timedelta(seconds=90)
-    upper_bound = now + timedelta(seconds=90)
+    db = firestore.client()
+    now_utc = datetime.now(pytz.utc)
+    now_taipei = now_utc.astimezone(TIMEZONE)
 
-    print(f"🔁 notify_task run @ {now.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"⏱️ 查詢時間範圍：{lower_bound} ~ {upper_bound}")
+    lower_bound = now_utc - timedelta(seconds=90)
+    upper_bound = now_utc + timedelta(seconds=90)
+
+    print(f"🔁 notify_task run (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🕰️ 台北時間：{now_taipei.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏱️ 查詢時間範圍（UTC）：{lower_bound} ~ {upper_bound}")
 
     try:
         docs = list(
