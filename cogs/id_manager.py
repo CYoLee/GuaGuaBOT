@@ -42,8 +42,10 @@ class IDManager(Cog):
             f"✅ Player ID `{player_id}` added successfully.", ephemeral=True
         )
 
-    @app_commands.command(name="remove_id", description="Remove a player ID")
-    @app_commands.describe(player_id="Player ID to remove (9 digits) / 移除玩家ID")
+    @app_commands.command(
+        name="remove_id", description="Remove a player ID / 移除玩家ID"
+    )
+    @app_commands.describe(player_id="Player ID to remove")
     async def remove_id(self, interaction: discord.Interaction, player_id: str):
         guild_id = str(interaction.guild_id)
         found = False
