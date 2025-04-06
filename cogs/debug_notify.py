@@ -72,4 +72,6 @@ class DebugNotify(Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(DebugNotify(bot))
+    cog = DebugNotify(bot)
+    await bot.add_cog(cog)
+    await cog.cog_load()
