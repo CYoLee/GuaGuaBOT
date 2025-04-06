@@ -1,4 +1,5 @@
 # tasks/notify_loop.py
+
 from datetime import datetime, timedelta
 from firebase_admin import firestore
 from google.cloud.firestore_v1 import FieldFilter
@@ -6,10 +7,10 @@ import pytz
 import discord
 
 TIMEZONE = pytz.timezone("Asia/Taipei")
-db = firestore.client()
 
 
 async def run_notify_once(bot: discord.Client):
+    db = firestore.client()  # ✅ 改成「延遲初始化」
     now = datetime.now(TIMEZONE)
     lower_bound = now - timedelta(seconds=90)
     upper_bound = now + timedelta(seconds=90)
