@@ -71,6 +71,10 @@ class DebugNotify(Cog):
             self.bot.tree.add_command(self.debug_firestore_count, guild=guild)
             print(f"✅ cog_load() triggered in debug_notify for guild: {gid}")
 
+        # ✅ 強制刷新一次指令（防止未同步成功）
+        synced = await self.bot.tree.sync(guild=guild)
+        print(f"🔁 Synced {len(synced)} command(s) to guild: {gid}")
+
 
 async def setup(bot):
     await bot.add_cog(DebugNotify(bot))
