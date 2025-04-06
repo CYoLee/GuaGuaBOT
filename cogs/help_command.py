@@ -29,8 +29,10 @@ class HelpCommand(Cog):
                 "• `/remove_id` - Remove a player ID\n"
                 "• `/list_ids` - List all saved player IDs\n"
                 "• `/add_notify` - Add event reminder\n"
+                "• `/edit_notify` - Edit reminder by index\n"
                 "• `/remove_notify` - Remove event reminder\n"
                 "• `/list_notify` - List all reminders\n"
+                "• `/help` - Show this help message"
             )
         else:
             content = (
@@ -40,8 +42,10 @@ class HelpCommand(Cog):
                 "• `/remove_id` - 移除玩家ID - 不要給我亂移除\n"
                 "• `/list_ids` - 列出所有玩家ID - 看看誰是幸運兒\n"
                 "• `/add_notify` - 新增活動提醒 - 可以指定標記\n"
+                "• `/edit_notify` - 編輯提醒內容（依 index 編號）\n"
                 "• `/remove_notify` - 移除活動提醒 - 打錯也不擔心\n"
                 "• `/list_notify` - 查看目前提醒列表 - 但你看不到誰要吵你\n"
+                "• `/help` - 顯示此說明"
             )
         await interaction.response.send_message(content, ephemeral=True)
 

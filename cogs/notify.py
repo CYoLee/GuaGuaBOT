@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ext.commands import Cog
 from firebase_admin import firestore
 from datetime import datetime
+from typing import Optional
 import pytz
 import os
 
@@ -42,6 +43,7 @@ class Notify(Cog):
         time="提醒時間（可多個，以逗號分隔）格式：HH:MM",
         message="提醒內容",
         mention="要標記的人（可選）",
+        channel="要發送提醒的頻道",
     )
     async def add_notify(
         self,
@@ -49,13 +51,24 @@ class Notify(Cog):
         date: str,
         time: str,
         message: str,
-        mention: str = None,
+        mention: Optional[str] = None,
+        channel: Optional[discord.TextChannel] = None,
     ):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "add_notify"):
             await interaction.followup.send("🚫 你沒有權限新增提醒。", ephemeral=True)
             return
+
+        if channel:
+            permissions = channel.permissions_for(interaction.user)
+            if not permissions.send_messages:
+                await interaction.followup.send(
+                    "❌ 你沒有權限發送到指定頻道。", ephemeral=True
+                )
+                return
+        else:
+            channel = interaction.channel
 
         dates = [d.strip() for d in date.split(",") if d.strip()]
         times = [t.strip() for t in time.split(",") if t.strip()]
@@ -82,7 +95,7 @@ class Notify(Cog):
 
             data = {
                 "guild_id": str(interaction.guild_id),
-                "channel_id": interaction.channel.id,
+                "channel_id": channel.id,
                 "datetime": aware_dt,
                 "mention": mention or "",
                 "message": message,
@@ -168,6 +181,7 @@ class Notify(Cog):
         time="新的時間（格式：HH:MM）",
         message="新的提醒內容",
         mention="新的 mention（可選）",
+        channel="新的發送頻道（可選）",
     )
     async def edit_notify(
         self,
@@ -177,6 +191,7 @@ class Notify(Cog):
         time: str = None,
         message: str = None,
         mention: str = None,
+        channel: Optional[discord.TextChannel] = None,
     ):
         await interaction.response.defer(thinking=True)
 
@@ -206,6 +221,14 @@ class Notify(Cog):
             updated_data["message"] = message
         if mention is not None:
             updated_data["mention"] = mention
+        if channel:
+            permissions = channel.permissions_for(interaction.user)
+            if not permissions.send_messages:
+                await interaction.followup.send(
+                    "❌ 你沒有權限發送到指定頻道。", ephemeral=True
+                )
+                return
+            updated_data["channel_id"] = channel.id
 
         if date or time:
             try:
