@@ -2,8 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext.commands import Cog
-
-GUILD_IDS = [1299413864160428054, 1125331349654470786]
+from config import GUILD_IDS
 
 
 class HelpCommand(Cog):
@@ -11,7 +10,7 @@ class HelpCommand(Cog):
         self.bot = bot
 
     @app_commands.command(name="help", description="Show help message / 顯示說明")
-    @app_commands.describe(language="Choose language (zh or en)")
+    @app_commands.describe(language="Choose language / 選擇語言")
     @app_commands.choices(
         language=[
             app_commands.Choice(name="繁體中文", value="zh"),
@@ -36,16 +35,16 @@ class HelpCommand(Cog):
             )
         else:
             content = (
-                "**GuaGuaBOT 指令列表（繁體中文）：**\n\n"
+                "**GuaGuaBOT 指令列表(繁體中文):**\n\n"
                 "• `/redeem_submit` - 呱呱要開機才能兌換\n"
                 "• `/add_id` - 新增玩家ID - 下次組隊兌換\n"
                 "• `/remove_id` - 移除玩家ID - 不要給我亂移除\n"
                 "• `/list_ids` - 列出所有玩家ID - 看看誰是幸運兒\n"
                 "• `/add_notify` - 新增活動提醒 - 可以指定標記\n"
-                "• `/edit_notify` - 編輯提醒內容（依 index 編號）\n"
+                "• `/edit_notify` - 編輯提醒內容(依 index 編號)\n"
                 "• `/remove_notify` - 移除活動提醒 - 打錯也不擔心\n"
                 "• `/list_notify` - 查看目前提醒列表 - 但你看不到誰要吵你\n"
-                "• `/help` - 顯示此說明"
+                "• `/help` - 顯示此說明 - 啥都不懂看這邊"
             )
         await interaction.response.send_message(content, ephemeral=True)
 

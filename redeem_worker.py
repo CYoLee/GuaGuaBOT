@@ -129,8 +129,12 @@ async def run_redeem(code: str, player_id: str, batch_id: str = "default") -> st
             ).stdout.strip()
 
         result = await asyncio.to_thread(call_redeem)
-        json.loads(result)  # 確保 JSON 格式正確
-        return result  # ⬅️ 正確傳回
+        try:
+            json.loads(result)  # 檢查格式
+        except Exception as e:
+            print("🚫 非預期的輸出：", result)  # 加這行 debug
+            raise
+        return result
 
     except subprocess.TimeoutExpired:
         return f"{player_id} -> Failed, Timeout"

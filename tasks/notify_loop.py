@@ -19,7 +19,7 @@ async def run_notify_once(bot: discord.Client):
 
     print(f"🔁 notify_task run (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"🕰️ 台北時間：{now_taipei.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"⏱️ 查詢時間範圍（UTC）：{lower_bound} ~ {upper_bound}")
+    print(f"⏱️ 查詢時間範圍(UTC):{lower_bound} ~ {upper_bound}")
 
     try:
         docs = list(

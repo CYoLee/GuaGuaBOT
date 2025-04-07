@@ -60,7 +60,7 @@ class DebugNotify(Cog):
         )
         count = sum(1 for _ in docs)
         await interaction.response.send_message(
-            f"📊 Firestore 中提醒總筆數：`{count}`", ephemeral=True
+            f"📊 資料庫中提醒總筆數：`{count}`", ephemeral=True
         )
 
     async def cog_load(self):

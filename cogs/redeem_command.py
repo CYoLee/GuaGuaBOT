@@ -3,9 +3,9 @@ import uuid
 from discord import app_commands
 from discord.ext.commands import Cog
 from firebase_admin import firestore
+from config import GUILD_IDS
 
 ENABLE_DIRECT_REDEEM = False
-GUILD_IDS = [1299413864160428054, 1125331349654470786]
 
 
 class RedeemCommand(Cog):

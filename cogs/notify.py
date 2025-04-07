@@ -36,14 +36,14 @@ class Notify(Cog):
         self.db = firestore.client()
 
     @app_commands.command(
-        name="add_notify", description="新增活動提醒（可多日期或多時間）"
+        name="add_notify", description="新增活動提醒(可多日期或多時間)"
     )
     @app_commands.describe(
-        date="提醒日期（可多個，以逗號分隔）格式：YYYY-MM-DD",
-        time="提醒時間（可多個，以逗號分隔）格式：HH:MM",
-        message="提醒內容",
-        mention="要標記的人（可選）",
-        channel="要發送提醒的頻道",
+        date="提醒日期 / Reminder date(s)(可多個, 以逗號分隔)格式:YYYY-MM-DD",
+        time="提醒時間/ Reminder time(s)(可多個, 以逗號分隔)格式:HH:MM",
+        message="提醒內容 / Reminder message",
+        mention="要標記的人(可選) / Person to mention (optional)",
+        channel="要發送提醒的頻道 / Target channel for the reminder",
     )
     async def add_notify(
         self,
@@ -57,14 +57,18 @@ class Notify(Cog):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "add_notify"):
-            await interaction.followup.send("🚫 你沒有權限新增提醒。", ephemeral=True)
+            await interaction.followup.send(
+                "🚫 你沒有權限新增提醒 / You are not allowed to add reminders",
+                ephemeral=True,
+            )
             return
 
         if channel:
             permissions = channel.permissions_for(interaction.user)
             if not permissions.send_messages:
                 await interaction.followup.send(
-                    "❌ 你沒有權限發送到指定頻道。", ephemeral=True
+                    "❌ 你沒有權限發送到指定頻道 / You can't post to the selected channel.",
+                    ephemeral=True,
                 )
                 return
         else:
@@ -75,7 +79,7 @@ class Notify(Cog):
 
         if len(dates) > 1 and len(times) > 1:
             await interaction.followup.send(
-                "❌ 僅允許「多個日期 + 單一時間」或「單一日期 + 多個時間」。",
+                "❌ 僅允許「多個日期 + 單一時間」或「單一日期 + 多個時間」 / Only multiple dates + one time OR one date + multiple times allowed",
                 ephemeral=True,
             )
             return
@@ -88,7 +92,7 @@ class Notify(Cog):
                 aware_dt = TIMEZONE.localize(naive_dt)
             except ValueError:
                 await interaction.followup.send(
-                    f"❌ 時間格式錯誤：{dt_str}，請使用 YYYY-MM-DD 與 HH:MM。",
+                    f"❌ 時間格式錯誤：{dt_str}，請使用 YYYY-MM-DD 與 HH:MM / Invalid time format. Use YYYY-MM-DD and HH:MM",
                     ephemeral=True,
                 )
                 return
@@ -102,10 +106,10 @@ class Notify(Cog):
             }
             self.db.collection("notifications").add(data)
 
-        await interaction.followup.send("✅ 提醒已新增。")
+        await interaction.followup.send("✅ 提醒已新增 / Reminder added")
 
     @app_commands.command(
-        name="list_notify", description="查看目前提醒列表（含 index）"
+        name="list_notify", description="查看目前提醒列表 / Reminder list"
     )
     async def list_notify(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -128,22 +132,24 @@ class Notify(Cog):
 
         if messages:
             await interaction.followup.send(
-                "📅 提醒列表（請記住 index 編號）：\n" + "\n".join(messages),
+                "📅 提醒列表：\n" + "\n".join(messages),
                 ephemeral=True,
             )
             self.bot.cached_notify_docs = indexed_docs
         else:
-            await interaction.followup.send("⚠️ 尚未設定任何提醒。", ephemeral=True)
+            await interaction.followup.send(
+                "⚠️ 尚未設定任何提醒 / No reminders found", ephemeral=True
+            )
 
-    @app_commands.command(
-        name="remove_notify", description="移除活動提醒（使用 index）"
-    )
-    @app_commands.describe(index="提醒列表中的編號")
+    @app_commands.command(name="remove_notify", description="移除活動提醒(使用 index)")
+    @app_commands.describe(index="提醒列表中的編號 / Reminder index")
     async def remove_notify(self, interaction: discord.Interaction, index: int):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "remove_notify"):
-            await interaction.followup.send("🚫 你沒有權限移除提醒。", ephemeral=True)
+            await interaction.followup.send(
+                "🚫 你沒有權限移除提醒 / You can't remove reminders", ephemeral=True
+            )
             return
 
         guild_id = str(interaction.guild_id)
@@ -156,32 +162,36 @@ class Notify(Cog):
         doc_list = list(docs)
 
         if index < 0 or index >= len(doc_list):
-            await interaction.followup.send("❌ 無效的 index 編號。", ephemeral=True)
+            await interaction.followup.send(
+                "❌ 無效的 index 編號 / Invalid index number", ephemeral=True
+            )
             return
 
         doc_id = doc_list[index].id
         self.db.collection("notifications").document(doc_id).delete()
         await interaction.followup.send(
-            f"🗑️ 已成功移除 index `{index}` 的提醒。", ephemeral=True
+            f"🗑️ 已成功移除 index `{index}` 的提醒 / Removed reminder index `{index}`",
+            ephemeral=True,
         )
 
         username = f"{interaction.user.name}#{interaction.user.discriminator}"
         user_id = interaction.user.id
         await send_notify_log(
             self.bot,
-            f"{username} ({user_id}) 移除了提醒 index `{index}`（doc ID: {doc_id}） in guild {interaction.guild_id}",
+            f"{username} ({user_id}) 移除了提醒 index `{index}`(doc ID: {doc_id}) in guild {interaction.guild_id}",
         )
 
     @app_commands.command(
-        name="edit_notify", description="編輯提醒內容（依 index 修改）"
+        name="edit_notify",
+        description="編輯提醒內容(依 index 修改) Edit reminder (by index)",
     )
     @app_commands.describe(
-        index="提醒列表中的編號",
-        date="新的日期（格式：YYYY-MM-DD）",
-        time="新的時間（格式：HH:MM）",
-        message="新的提醒內容",
-        mention="新的 mention（可選）",
-        channel="新的發送頻道（可選）",
+        index="提醒列表中的編號 / Reminder index",
+        date="新的日期 / New date(格式:YYYY-MM-DD)",
+        time="新的時間 / New time(格式:HH:MM)",
+        message="新的提醒內容 / New message",
+        mention="新的mention(可選) / New mention (optional)",
+        channel="新的發送頻道(可選) / New channel (optional)",
     )
     async def edit_notify(
         self,
@@ -196,7 +206,9 @@ class Notify(Cog):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "edit_notify"):
-            await interaction.followup.send("🚫 你沒有權限編輯提醒。", ephemeral=True)
+            await interaction.followup.send(
+                "🚫 你沒有權限編輯提醒 / You can't edit reminders", ephemeral=True
+            )
             return
 
         guild_id = str(interaction.guild_id)
@@ -209,7 +221,9 @@ class Notify(Cog):
         doc_list = list(docs)
 
         if index < 0 or index >= len(doc_list):
-            await interaction.followup.send("❌ 無效的 index 編號。", ephemeral=True)
+            await interaction.followup.send(
+                "❌ 無效的 index 編號 / Invalid index", ephemeral=True
+            )
             return
 
         doc_ref = doc_list[index].reference
@@ -225,7 +239,8 @@ class Notify(Cog):
             permissions = channel.permissions_for(interaction.user)
             if not permissions.send_messages:
                 await interaction.followup.send(
-                    "❌ 你沒有權限發送到指定頻道。", ephemeral=True
+                    "❌ 你沒有權限發送到指定頻道 / No permission to post in this channel",
+                    ephemeral=True,
                 )
                 return
             updated_data["channel_id"] = channel.id
@@ -239,18 +254,22 @@ class Notify(Cog):
                 updated_data["datetime"] = TIMEZONE.localize(naive_dt)
             except ValueError:
                 await interaction.followup.send(
-                    "❌ 新的時間格式錯誤，請使用 YYYY-MM-DD 與 HH:MM。", ephemeral=True
+                    "❌ 新的時間格式錯誤，請使用 YYYY-MM-DD 與 HH:MM / New date/time format invalid",
+                    ephemeral=True,
                 )
                 return
 
         if not updated_data:
             await interaction.followup.send(
-                "⚠️ 請至少填寫一個要修改的欄位。", ephemeral=True
+                "⚠️ 請至少填寫一個要修改的欄位 / Please fill at least one field to edit",
+                ephemeral=True,
             )
             return
 
         doc_ref.update(updated_data)
-        await interaction.followup.send("✅ 提醒已成功更新。", ephemeral=True)
+        await interaction.followup.send(
+            "✅ 提醒已成功更新 / Reminder updated", ephemeral=True
+        )
 
         username = f"{interaction.user.name}#{interaction.user.discriminator}"
         user_id = interaction.user.id
