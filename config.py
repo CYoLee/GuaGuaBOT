@@ -1,6 +1,9 @@
-# config.py
+import os
 
 GUILD_IDS = [1299413864160428054, 1125331349654470786]
+
+LOG_FIRESTORE_ENABLED = os.getenv("LOG_FIRESTORE_ENABLED", "true").lower() == "true"
+ENABLE_DEBUG_COMMANDS = os.getenv("ENABLE_DEBUG_COMMANDS", "false").lower() == "true"
 
 ROLE_PERMISSIONS = {
     "add_notify": [1299676212247138314],

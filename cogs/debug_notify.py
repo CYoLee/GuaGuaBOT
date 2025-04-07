@@ -7,11 +7,11 @@ from config import GUILD_IDS
 from tasks.notify_loop import run_notify_once
 from firebase_admin import firestore
 from datetime import datetime
+from config import ENABLE_DEBUG_COMMANDS
 import pytz
 
 OWNER_ID = 271962747225374721
 TIMEZONE = pytz.timezone("Asia/Taipei")
-ENABLE_DEBUG_COMMANDS = os.getenv("ENABLE_DEBUG_COMMANDS", "false").lower() == "true"
 
 
 class DebugNotify(Cog):

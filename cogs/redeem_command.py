@@ -17,13 +17,12 @@ class RedeemCommand(Cog):
         name="redeem_submit",
         description="Submit gift code / 提交兌換碼（呱呱要開功能）",
     )
-    @app_commands.describe(code="禮包碼", player_id="玩家 ID（可選）")
+    @app_commands.describe(code="禮包碼", player_id="玩家 ID(可選)")
     async def redeem_submit(
         self, interaction: discord.Interaction, code: str, player_id: str = None
     ):
         await interaction.response.defer(thinking=True)
 
-        # 驗證 code 格式
         if len(code) < 6 or code.isdigit():
             await interaction.followup.send(
                 "❌ Invalid code format. Code must be at least 6 characters and contain letters.",
@@ -33,7 +32,6 @@ class RedeemCommand(Cog):
 
         guild_id = str(interaction.guild_id)
 
-        # 多人模式：處理所有 Firestore IDs
         if not player_id:
             docs = (
                 self.db.collection("ids")
@@ -42,8 +40,6 @@ class RedeemCommand(Cog):
                 .stream()
             )
             player_ids = [doc.to_dict()["player_id"] for doc in docs]
-
-            # 產生 batch_id 讓 worker 統整回傳
             batch_id = str(uuid.uuid4())[:8]
 
             for pid in player_ids:
@@ -57,10 +53,10 @@ class RedeemCommand(Cog):
                 self.db.collection("redeem_tasks").add(task)
 
             await interaction.followup.send(
-                "All players submitted. Waiting for redeem result..."
+                "All players submitted. Waiting for redeem result...",
+                ephemeral=True,
             )
         else:
-            # 單人模式：驗證 player_id 格式
             if not (player_id.isdigit() and len(player_id) == 9):
                 await interaction.followup.send(
                     "❌ Invalid player ID. Must be 9-digit numeric ID.",
@@ -68,7 +64,6 @@ class RedeemCommand(Cog):
                 )
                 return
 
-            # 檢查是否在 Firestore 中
             docs = (
                 self.db.collection("ids")
                 .document(guild_id)
@@ -79,7 +74,6 @@ class RedeemCommand(Cog):
             found = any(True for _ in docs)
 
             if not found:
-                # 若不在則加入 Firestore 並通知
                 self.db.collection("ids").document(guild_id).collection(
                     "players"
                 ).document(player_id).set({"player_id": player_id})
@@ -88,7 +82,6 @@ class RedeemCommand(Cog):
                     ephemeral=True,
                 )
 
-            # 建立兌換任務
             task = {
                 "code": code,
                 "player_id": player_id,
@@ -99,7 +92,8 @@ class RedeemCommand(Cog):
             self.db.collection("redeem_tasks").add(task)
 
             await interaction.followup.send(
-                f"{player_id} -> Waiting for redeem result..."
+                f"{player_id} -> Waiting for redeem result...",
+                ephemeral=True,
             )
 
     async def cog_load(self):

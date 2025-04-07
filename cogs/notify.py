@@ -6,9 +6,8 @@ from firebase_admin import firestore
 from datetime import datetime
 from typing import Optional
 import pytz
-import os
 
-from config import GUILD_IDS, ROLE_PERMISSIONS, LOG_CHANNEL_ID
+from config import GUILD_IDS, ROLE_PERMISSIONS, LOG_CHANNEL_ID, LOG_FIRESTORE_ENABLED
 
 TIMEZONE = pytz.timezone("Asia/Taipei")
 
@@ -18,16 +17,32 @@ def has_permission(interaction: discord.Interaction, command_name: str) -> bool:
     return any(role.id in allowed_roles for role in interaction.user.roles)
 
 
-async def send_notify_log(bot: discord.Client, message: str):
+async def send_notify_log(
+    bot: discord.Client, message: str, guild_id: Optional[str] = None
+):
+    timestamp = datetime.now().astimezone(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
+
     try:
         channel = await bot.fetch_channel(LOG_CHANNEL_ID)
         if channel:
-            timestamp = (
-                datetime.now().astimezone(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
-            )
             await channel.send(f"📝 [`{timestamp}`] {message}")
     except Exception as e:
-        print(f"❌ Failed to send notify log: {type(e).__name__}: {e}")
+        print(f"❌ Discord log failed: {type(e).__name__}: {e}")
+
+    if LOG_FIRESTORE_ENABLED:
+        try:
+            db = firestore.client()
+            log_data = {
+                "message": message,
+                "timestamp": firestore.SERVER_TIMESTAMP,
+                "datetime": timestamp,
+                "source": "notify.py",
+            }
+            if guild_id:
+                log_data["guild_id"] = str(guild_id)
+            db.collection("logs").add(log_data)
+        except Exception as e:
+            print(f"❌ Firestore log failed: {type(e).__name__}: {e}")
 
 
 class Notify(Cog):
@@ -39,11 +54,11 @@ class Notify(Cog):
         name="add_notify", description="新增活動提醒(可多日期或多時間)"
     )
     @app_commands.describe(
-        date="提醒日期 / Reminder date(s)(可多個, 以逗號分隔)格式:YYYY-MM-DD",
-        time="提醒時間/ Reminder time(s)(可多個, 以逗號分隔)格式:HH:MM",
-        message="提醒內容 / Reminder message",
-        mention="要標記的人(可選) / Person to mention (optional)",
-        channel="要發送提醒的頻道 / Target channel for the reminder",
+        date="提醒日期 (YYYY-MM-DD, 多個用逗號分隔)",
+        time="提醒時間 (HH:MM, 多個用逗號分隔)",
+        message="提醒內容",
+        mention="要標記的人 (可選)",
+        channel="發送頻道 (可選)",
     )
     async def add_notify(
         self,
@@ -57,18 +72,13 @@ class Notify(Cog):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "add_notify"):
-            await interaction.followup.send(
-                "🚫 你沒有權限新增提醒 / You are not allowed to add reminders",
-                ephemeral=True,
-            )
+            await interaction.followup.send("🚫 你沒有權限新增提醒", ephemeral=True)
             return
 
         if channel:
-            permissions = channel.permissions_for(interaction.user)
-            if not permissions.send_messages:
+            if not channel.permissions_for(interaction.user).send_messages:
                 await interaction.followup.send(
-                    "❌ 你沒有權限發送到指定頻道 / You can't post to the selected channel.",
-                    ephemeral=True,
+                    "❌ 沒有權限發送到該頻道", ephemeral=True
                 )
                 return
         else:
@@ -79,8 +89,7 @@ class Notify(Cog):
 
         if len(dates) > 1 and len(times) > 1:
             await interaction.followup.send(
-                "❌ 僅允許「多個日期 + 單一時間」或「單一日期 + 多個時間」 / Only multiple dates + one time OR one date + multiple times allowed",
-                ephemeral=True,
+                "❌ 僅支援多日期+單時間 或 單日期+多時間", ephemeral=True
             )
             return
 
@@ -88,110 +97,93 @@ class Notify(Cog):
         for i in total:
             try:
                 dt_str = f"{i} {times[0]}" if len(times) == 1 else f"{dates[0]} {i}"
-                naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-                aware_dt = TIMEZONE.localize(naive_dt)
+                dt = TIMEZONE.localize(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
             except ValueError:
                 await interaction.followup.send(
-                    f"❌ 時間格式錯誤：{dt_str}，請使用 YYYY-MM-DD 與 HH:MM / Invalid time format. Use YYYY-MM-DD and HH:MM",
-                    ephemeral=True,
+                    f"❌ 時間格式錯誤：{dt_str}", ephemeral=True
                 )
                 return
 
-            data = {
-                "guild_id": str(interaction.guild_id),
-                "channel_id": channel.id,
-                "datetime": aware_dt,
-                "mention": mention or "",
-                "message": message,
-            }
-            self.db.collection("notifications").add(data)
+            self.db.collection("notifications").add(
+                {
+                    "guild_id": str(interaction.guild_id),
+                    "channel_id": channel.id,
+                    "datetime": dt,
+                    "mention": mention or "",
+                    "message": message,
+                }
+            )
 
-        await interaction.followup.send("✅ 提醒已新增 / Reminder added")
+            await send_notify_log(
+                self.bot,
+                f"{interaction.user} 新增提醒 `{dt_str}` 到 <#{channel.id}> in guild {interaction.guild_id}",
+                guild_id=interaction.guild_id,
+            )
 
-    @app_commands.command(
-        name="list_notify", description="查看目前提醒列表 / Reminder list"
-    )
+        await interaction.followup.send("✅ 提醒已新增", ephemeral=True)
+
+    @app_commands.command(name="list_notify", description="查看提醒列表")
     async def list_notify(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
 
-        guild_id = str(interaction.guild_id)
         docs = (
             self.db.collection("notifications")
-            .where("guild_id", "==", guild_id)
+            .where("guild_id", "==", str(interaction.guild_id))
             .order_by("datetime")
             .stream()
         )
+        docs = list(docs)
+        if not docs:
+            await interaction.followup.send("⚠️ 尚未設定任何提醒", ephemeral=True)
+            return
 
-        messages = []
-        indexed_docs = []
-        for i, doc in enumerate(docs):
-            data = doc.to_dict()
-            dt = data["datetime"].astimezone(TIMEZONE).strftime("%Y-%m-%d %H:%M")
-            messages.append(f"[{i}] {dt} | {data['message']}")
-            indexed_docs.append((i, doc.id))
+        self.bot.cached_notify_docs = [(i, d.id) for i, d in enumerate(docs)]
+        messages = [
+            f"[{i}] {d.to_dict()['datetime'].astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M')} | {d.to_dict()['message']}"
+            for i, d in enumerate(docs)
+        ]
+        await interaction.followup.send(
+            "📅 提醒列表：\n" + "\n".join(messages), ephemeral=True
+        )
 
-        if messages:
-            await interaction.followup.send(
-                "📅 提醒列表：\n" + "\n".join(messages),
-                ephemeral=True,
-            )
-            self.bot.cached_notify_docs = indexed_docs
-        else:
-            await interaction.followup.send(
-                "⚠️ 尚未設定任何提醒 / No reminders found", ephemeral=True
-            )
-
-    @app_commands.command(name="remove_notify", description="移除活動提醒(使用 index)")
-    @app_commands.describe(index="提醒列表中的編號 / Reminder index")
+    @app_commands.command(name="remove_notify", description="移除提醒 (index)")
+    @app_commands.describe(index="提醒編號")
     async def remove_notify(self, interaction: discord.Interaction, index: int):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "remove_notify"):
-            await interaction.followup.send(
-                "🚫 你沒有權限移除提醒 / You can't remove reminders", ephemeral=True
-            )
+            await interaction.followup.send("🚫 你沒有權限移除提醒", ephemeral=True)
             return
 
-        guild_id = str(interaction.guild_id)
         docs = (
             self.db.collection("notifications")
-            .where("guild_id", "==", guild_id)
+            .where("guild_id", "==", str(interaction.guild_id))
             .order_by("datetime")
             .stream()
         )
         doc_list = list(docs)
-
         if index < 0 or index >= len(doc_list):
-            await interaction.followup.send(
-                "❌ 無效的 index 編號 / Invalid index number", ephemeral=True
-            )
+            await interaction.followup.send("❌ 無效 index", ephemeral=True)
             return
 
         doc_id = doc_list[index].id
         self.db.collection("notifications").document(doc_id).delete()
-        await interaction.followup.send(
-            f"🗑️ 已成功移除 index `{index}` 的提醒 / Removed reminder index `{index}`",
-            ephemeral=True,
-        )
 
-        username = f"{interaction.user.name}#{interaction.user.discriminator}"
-        user_id = interaction.user.id
+        await interaction.followup.send(f"🗑️ 已移除提醒 index `{index}`", ephemeral=True)
         await send_notify_log(
             self.bot,
-            f"{username} ({user_id}) 移除了提醒 index `{index}`(doc ID: {doc_id}) in guild {interaction.guild_id}",
+            f"{interaction.user} 移除了提醒 index `{index}`（doc: {doc_id}）in guild {interaction.guild_id}",
+            guild_id=interaction.guild_id,
         )
 
-    @app_commands.command(
-        name="edit_notify",
-        description="編輯提醒內容(依 index 修改) Edit reminder (by index)",
-    )
+    @app_commands.command(name="edit_notify", description="編輯提醒內容 (by index)")
     @app_commands.describe(
-        index="提醒列表中的編號 / Reminder index",
-        date="新的日期 / New date(格式:YYYY-MM-DD)",
-        time="新的時間 / New time(格式:HH:MM)",
-        message="新的提醒內容 / New message",
-        mention="新的mention(可選) / New mention (optional)",
-        channel="新的發送頻道(可選) / New channel (optional)",
+        index="提醒編號",
+        date="新日期(YYYY-MM-DD)",
+        time="新時間(HH:MM)",
+        message="新提醒內容",
+        mention="新 mention (可選)",
+        channel="新頻道 (可選)",
     )
     async def edit_notify(
         self,
@@ -206,76 +198,56 @@ class Notify(Cog):
         await interaction.response.defer(thinking=True)
 
         if not has_permission(interaction, "edit_notify"):
-            await interaction.followup.send(
-                "🚫 你沒有權限編輯提醒 / You can't edit reminders", ephemeral=True
-            )
+            await interaction.followup.send("🚫 你沒有權限編輯提醒", ephemeral=True)
             return
 
-        guild_id = str(interaction.guild_id)
         docs = (
             self.db.collection("notifications")
-            .where("guild_id", "==", guild_id)
+            .where("guild_id", "==", str(interaction.guild_id))
             .order_by("datetime")
             .stream()
         )
         doc_list = list(docs)
-
         if index < 0 or index >= len(doc_list):
-            await interaction.followup.send(
-                "❌ 無效的 index 編號 / Invalid index", ephemeral=True
-            )
+            await interaction.followup.send("❌ 無效的 index", ephemeral=True)
             return
 
         doc_ref = doc_list[index].reference
         old_data = doc_list[index].to_dict()
-
-        updated_data = {}
+        updated = {}
 
         if message:
-            updated_data["message"] = message
+            updated["message"] = message
         if mention is not None:
-            updated_data["mention"] = mention
+            updated["mention"] = mention
         if channel:
-            permissions = channel.permissions_for(interaction.user)
-            if not permissions.send_messages:
-                await interaction.followup.send(
-                    "❌ 你沒有權限發送到指定頻道 / No permission to post in this channel",
-                    ephemeral=True,
-                )
+            if not channel.permissions_for(interaction.user).send_messages:
+                await interaction.followup.send("❌ 沒有權限發送到頻道", ephemeral=True)
                 return
-            updated_data["channel_id"] = channel.id
-
+            updated["channel_id"] = channel.id
         if date or time:
             try:
-                date_str = date if date else old_data["datetime"].strftime("%Y-%m-%d")
-                time_str = time if time else old_data["datetime"].strftime("%H:%M")
-                dt_str = f"{date_str} {time_str}"
-                naive_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-                updated_data["datetime"] = TIMEZONE.localize(naive_dt)
-            except ValueError:
-                await interaction.followup.send(
-                    "❌ 新的時間格式錯誤，請使用 YYYY-MM-DD 與 HH:MM / New date/time format invalid",
-                    ephemeral=True,
+                date_str = date or old_data["datetime"].strftime("%Y-%m-%d")
+                time_str = time or old_data["datetime"].strftime("%H:%M")
+                dt = TIMEZONE.localize(
+                    datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
                 )
+                updated["datetime"] = dt
+            except ValueError:
+                await interaction.followup.send("❌ 時間格式錯誤", ephemeral=True)
                 return
 
-        if not updated_data:
-            await interaction.followup.send(
-                "⚠️ 請至少填寫一個要修改的欄位 / Please fill at least one field to edit",
-                ephemeral=True,
-            )
+        if not updated:
+            await interaction.followup.send("⚠️ 請填寫至少一項欄位", ephemeral=True)
             return
 
-        doc_ref.update(updated_data)
-        await interaction.followup.send(
-            "✅ 提醒已成功更新 / Reminder updated", ephemeral=True
-        )
+        doc_ref.update(updated)
+        await interaction.followup.send("✅ 提醒已更新", ephemeral=True)
 
-        username = f"{interaction.user.name}#{interaction.user.discriminator}"
-        user_id = interaction.user.id
         await send_notify_log(
             self.bot,
-            f"{username} ({user_id}) 編輯提醒 index `{index}` in guild {interaction.guild_id}，欄位更新: {list(updated_data.keys())}",
+            f"{interaction.user} 編輯提醒 index `{index}` in guild {interaction.guild_id}，更新欄位: {list(updated.keys())}",
+            guild_id=interaction.guild_id,
         )
 
     async def cog_load(self):
