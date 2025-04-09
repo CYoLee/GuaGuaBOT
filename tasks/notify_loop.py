@@ -41,9 +41,9 @@ async def run_notify_once(bot: discord.Client):
                 channel = await bot.fetch_channel(channel_id)
                 if channel:
                     content = (
-                        f"{mention}\n⏰ 活動提醒 ⏰{message}"
-                        if mention
-                        else f"⏰ 活動提醒 ⏰{message}"
+                        f"{mention}\n⏰ 活動提醒 ⏰\n{message}"
+                        if mention and mention.strip()
+                        else f"⏰ 活動提醒 ⏰\n{message}"
                     )
                     await channel.send(content)
                     db.collection("notifications").document(doc.id).delete()
