@@ -69,7 +69,7 @@ class Notify(Cog):
         mention: Optional[str] = None,
         channel: Optional[discord.TextChannel] = None,
     ):
-        await interaction.response.defer(thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if not has_permission(interaction, "add_notify"):
             await interaction.followup.send("🚫 你沒有權限新增提醒", ephemeral=True)
@@ -124,7 +124,7 @@ class Notify(Cog):
 
     @app_commands.command(name="list_notify", description="查看提醒列表")
     async def list_notify(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         docs = (
             self.db.collection("notifications")
@@ -134,7 +134,7 @@ class Notify(Cog):
         )
         docs = list(docs)
         if not docs:
-            await interaction.followup.send("⚠️ 尚未設定任何提醒", ephemeral=True)
+            await interaction.followup.send("⚠️ 尚未設定任何提醒")
             return
 
         self.bot.cached_notify_docs = [(i, d.id) for i, d in enumerate(docs)]
@@ -142,14 +142,12 @@ class Notify(Cog):
             f"[{i}] {d.to_dict()['datetime'].astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M')} | {d.to_dict()['message']}"
             for i, d in enumerate(docs)
         ]
-        await interaction.followup.send(
-            "📅 提醒列表：\n" + "\n".join(messages), ephemeral=True
-        )
+        await interaction.followup.send("📅 提醒列表：\n" + "\n".join(messages))
 
     @app_commands.command(name="remove_notify", description="移除提醒 (index)")
     @app_commands.describe(index="提醒編號")
     async def remove_notify(self, interaction: discord.Interaction, index: int):
-        await interaction.response.defer(thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if not has_permission(interaction, "remove_notify"):
             await interaction.followup.send("🚫 你沒有權限移除提醒", ephemeral=True)
@@ -195,10 +193,10 @@ class Notify(Cog):
         mention: str = None,
         channel: Optional[discord.TextChannel] = None,
     ):
-        await interaction.response.defer(thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         if not has_permission(interaction, "edit_notify"):
-            await interaction.followup.send("🚫 你沒有權限編輯提醒", ephemeral=True)
+            await interaction.followup.send("🚫 你沒有權限編輯提醒")
             return
 
         docs = (
@@ -209,7 +207,7 @@ class Notify(Cog):
         )
         doc_list = list(docs)
         if index < 0 or index >= len(doc_list):
-            await interaction.followup.send("❌ 無效的 index", ephemeral=True)
+            await interaction.followup.send("❌ 無效的 index")
             return
 
         doc_ref = doc_list[index].reference
@@ -222,7 +220,7 @@ class Notify(Cog):
             updated["mention"] = mention
         if channel:
             if not channel.permissions_for(interaction.user).send_messages:
-                await interaction.followup.send("❌ 沒有權限發送到頻道", ephemeral=True)
+                await interaction.followup.send("❌ 沒有權限發送到頻道")
                 return
             updated["channel_id"] = channel.id
         if date or time:
@@ -234,15 +232,15 @@ class Notify(Cog):
                 )
                 updated["datetime"] = dt
             except ValueError:
-                await interaction.followup.send("❌ 時間格式錯誤", ephemeral=True)
+                await interaction.followup.send("❌ 時間格式錯誤")
                 return
 
         if not updated:
-            await interaction.followup.send("⚠️ 請填寫至少一項欄位", ephemeral=True)
+            await interaction.followup.send("⚠️ 請填寫至少一項欄位")
             return
 
         doc_ref.update(updated)
-        await interaction.followup.send("✅ 提醒已更新", ephemeral=True)
+        await interaction.followup.send("✅ 提醒已更新")
 
         await send_notify_log(
             self.bot,
