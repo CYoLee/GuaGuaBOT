@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pytz
 from tasks.notify_loop import run_notify_once
 import firebase_admin
+import json
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
 
@@ -17,9 +18,13 @@ GUILD_IDS = [1299413864160428054, 1125331349654470786]
 TIMEZONE = pytz.timezone("Asia/Taipei")
 
 # 初始化 Firebase
-cred_json = os.environ.get("FIREBASE_CREDENTIALS", "{}")
-cred = credentials.Certificate(eval(cred_json))
+cred_json = json.loads(os.environ.get("FIREBASE_CREDENTIALS", "{}"))
+if "private_key" in cred_json:
+    cred_json["private_key"] = cred_json["private_key"].replace("\\n", "\n")
+
+cred = credentials.Certificate(cred_json)
 firebase_admin.initialize_app(cred)
+
 db = firestore.client()
 
 intents = discord.Intents.default()

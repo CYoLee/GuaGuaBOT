@@ -13,6 +13,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from PIL import Image
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Firebase (only once)
+if not firebase_admin._apps:
+    cred = credentials.ApplicationDefault()
+    firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 BATCH_ID = os.environ.get("BATCH_ID", "default")
 URL = "https://wos-giftcode.centurygame.com/"
@@ -143,6 +151,18 @@ for player_id in player_ids:
         new_name = f"{player_id}_{timestamp}_{'fail' if is_failed else 'success'}.png"
         os.rename(temp_path, os.path.join(SCREENSHOT_DIR, new_name))
 
+        # Firestore logging
+        result_data = {
+            "code": REDEEM_CODE,
+            "player_id": player_id,
+            "batch_id": BATCH_ID,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "datetime": datetime.now().isoformat(),
+            "result": "fail" if is_failed else "success",
+            "reason": reason,
+        }
+        db.collection("redeem_logs").add(result_data)
+
         if is_failed:
             failure.append((player_id, reason))
         else:
@@ -154,7 +174,7 @@ for player_id in player_ids:
         err_img = os.path.join(SCREENSHOT_DIR, f"{player_id}_{timestamp}_error.png")
         driver.save_screenshot(err_img)
 
-    # 每位玩家的獨立 log 覆蓋
+    # Write per-player log
     player_log_path = os.path.join(LOG_DIR, f"{player_id}_latest.txt")
     player_ocr_path = os.path.join(LOG_DIR, f"ocr_{player_id}_latest.txt")
     with open(player_log_path, "w", encoding="utf-8") as f:
@@ -162,22 +182,26 @@ for player_id in player_ids:
         f.write(f"[{player_id}] Failure: {any(p[0] == player_id for p in failure)}\n")
     with open(player_ocr_path, "w", encoding="utf-8") as f:
         f.writelines(player_ocr_log)
+    ocr_log_lines.extend(player_ocr_log)
 
 driver.quit()
 
-# 統一結果輸出
+# Final print
 result_object = {"success": success, "failure": failure}
 print(json.dumps(result_object, ensure_ascii=False), end="")
 
-# 共用 batch log 追加
-log_path = os.path.join(LOG_DIR, f"log_{BATCH_ID}.txt")
-ocr_log_path = os.path.join(LOG_DIR, f"ocr_log_{BATCH_ID}.txt")
-summary_lines = [f"--- Summary ({datetime.now()}) ---\n"]
+# Append summary log
+log_path = os.path.join(LOG_DIR, f"{BATCH_ID}_log.txt")
+ocr_log_path = os.path.join(LOG_DIR, f"{BATCH_ID}_ocr_log.txt")
+
+summary_lines = [f"--- Summary ({datetime.now()}) ---\n\n"]
 summary_lines += [f" - {s[0]} -> {s[1]}\n" for s in success]
 summary_lines += [f" - {f[0]} -> Failed, {f[1]}\n" for f in failure]
-output_log = "".join(summary_lines)
 
 with open(log_path, "a", encoding="utf-8") as f:
-    f.write(output_log)
+    f.writelines(summary_lines)
 with open(ocr_log_path, "a", encoding="utf-8") as f:
     f.writelines(ocr_log_lines)
+
+# Exit with 1 if failure exists
+sys.exit(1 if failure else 0)
