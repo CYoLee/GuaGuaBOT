@@ -16,16 +16,26 @@ from PIL import Image
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Initialize Firebase (only once)
+# Firebase 初始化（從 .env 抓 FIREBASE_CREDENTIALS）
+from dotenv import load_dotenv
+
+load_dotenv()
+
+cred_json = json.loads(os.environ.get("FIREBASE_CREDENTIALS", "{}"))
+if "private_key" in cred_json:
+    cred_json["private_key"] = cred_json["private_key"].replace("\\n", "\n")
+
 if not firebase_admin._apps:
-    cred = credentials.ApplicationDefault()
+    cred = credentials.Certificate(cred_json)
     firebase_admin.initialize_app(cred)
+
 db = firestore.client()
+
 
 BATCH_ID = os.environ.get("BATCH_ID", "default")
 URL = "https://wos-giftcode.centurygame.com/"
-SCREENSHOT_DIR = "screenshots"
-LOG_DIR = "logs"
+SCREENSHOT_DIR = os.path.join("screenshots", BATCH_ID)
+LOG_DIR = os.path.join("logs", BATCH_ID)
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -148,7 +158,8 @@ for player_id in player_ids:
         ocr_text, is_failed = is_failure_screenshot(temp_path)
         player_ocr_log.append(f"{os.path.basename(temp_path)} OCR:\n{ocr_text}\n\n")
         reason = extract_failure_reason(ocr_text) if is_failed else ""
-        new_name = f"{player_id}_{timestamp}_{'fail' if is_failed else 'success'}.png"
+        suffix = reason.replace(" ", "_") if is_failed else "Success"
+        new_name = f"{player_id}_{timestamp}_{suffix}.png"
         os.rename(temp_path, os.path.join(SCREENSHOT_DIR, new_name))
 
         # Firestore logging
@@ -169,17 +180,13 @@ for player_id in player_ids:
             success.append((player_id, "Success"))
 
     except Exception as e:
-        failure.append((player_id, f"Exception: {type(e).__name__}"))
+        failure.append((player_id, f"Exception: {type(e).__name__}: {e}"))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         err_img = os.path.join(SCREENSHOT_DIR, f"{player_id}_{timestamp}_error.png")
         driver.save_screenshot(err_img)
 
     # Write per-player log
-    player_log_path = os.path.join(LOG_DIR, f"{player_id}_latest.txt")
     player_ocr_path = os.path.join(LOG_DIR, f"ocr_{player_id}_latest.txt")
-    with open(player_log_path, "w", encoding="utf-8") as f:
-        f.write(f"[{player_id}] Success: {any(p[0] == player_id for p in success)}\n")
-        f.write(f"[{player_id}] Failure: {any(p[0] == player_id for p in failure)}\n")
     with open(player_ocr_path, "w", encoding="utf-8") as f:
         f.writelines(player_ocr_log)
     ocr_log_lines.extend(player_ocr_log)
@@ -191,8 +198,8 @@ result_object = {"success": success, "failure": failure}
 print(json.dumps(result_object, ensure_ascii=False), end="")
 
 # Append summary log
-log_path = os.path.join(LOG_DIR, f"{BATCH_ID}_log.txt")
-ocr_log_path = os.path.join(LOG_DIR, f"{BATCH_ID}_ocr_log.txt")
+log_path = os.path.join(LOG_DIR, "log.txt")
+ocr_log_path = os.path.join(LOG_DIR, "ocr_log.txt")
 
 summary_lines = [f"--- Summary ({datetime.now()}) ---\n\n"]
 summary_lines += [f" - {s[0]} -> {s[1]}\n" for s in success]
